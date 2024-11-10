@@ -11,7 +11,7 @@ func init() {
 }
 
 type reiszeCommand struct {
-	Path    string  `short:"p" long:"path" description:"Full path" default:"/Users/JP17278/Downloads/00022_sansyoku"`
+	Path    string  `short:"p" long:"path" description:"Full path" default:"data"`
 	Width   int     `short:"w" long:"width" description:"Limit width" default:"2266"`
 	Size    int64   `short:"s" long:"size" description:"Limit size (kb)" default:"30720"`
 	Percent float64 `long:"percent" description:"Resize percentages" default:"95.0"`

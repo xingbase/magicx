@@ -14,7 +14,7 @@ func init() {
 }
 
 type renameCommand struct {
-	Path string `short:"p" long:"path" description:"Full path" default:"/Users/JP17278/Downloads/00022_sansyoku"`
+	Path string `short:"p" long:"path" description:"Full path" default:"data"`
 	Num  int    `short:"n" long:"num" description:"Suffix number" default:"3"`
 }
 
