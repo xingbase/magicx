@@ -57,7 +57,7 @@ func Load(dir string) <-chan FileInfo {
 	return out
 }
 
-func Rename(in <-chan FileInfo) <-chan FileInfo {
+func Rename(in <-chan FileInfo, n int) <-chan FileInfo {
 	out := make(chan FileInfo)
 
 	go func() {
@@ -70,6 +70,7 @@ func Rename(in <-chan FileInfo) <-chan FileInfo {
 
 			if len(num) < 3 {
 				newNum := fmt.Sprintf("%03s", num)
+
 				newFile := strings.Replace(file.Name, num+file.Ext, newNum+file.Ext, 1)
 
 				err := os.Rename(file.Name, newFile)
@@ -77,6 +78,8 @@ func Rename(in <-chan FileInfo) <-chan FileInfo {
 					fmt.Printf("Error rename file %s: %v\n", file.Name, err)
 					continue
 				}
+
+				file.Name = newFile
 			}
 
 			out <- file
@@ -95,14 +98,13 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 			file, err := os.Open(path.Name)
 			if err != nil {
 				fmt.Printf("Error opening file %v\n", err)
-				return
 			}
-			defer file.Close()
 
 			img, format, err := image.Decode(file)
+			file.Close()
 			if err != nil {
 				fmt.Printf("Error decoding image %v\n", err)
-				return
+				continue
 			}
 
 			out <- ImageInfo{Path: path.Name, Size: path.Size, Image: img, Format: format}
@@ -112,7 +114,7 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 	return out
 }
 
-func Resize(in <-chan ImageInfo) <-chan ImageInfo {
+func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, percent float64) <-chan ImageInfo {
 	out := make(chan ImageInfo)
 
 	go func() {
@@ -122,27 +124,30 @@ func Resize(in <-chan ImageInfo) <-chan ImageInfo {
 			width, height := bounds.Dx(), bounds.Dy()
 			fmt.Printf("Original - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
 
-			// TODO: rule
-			// 1. check width over
-			// 2. check size over
-			if width > 1600 {
-				newWidth := 1600
-				newHeight := int(float64(height) * float64(newWidth) / float64(width))
-				dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
-				draw.ApproxBiLinear.Scale(dst, dst.Rect, img.Image, img.Image.Bounds(), draw.Over, nil)
-				img.Image = dst
-				fmt.Printf("Resized  - filename: %s  width:%d  height:%d\n", filepath.Base(img.Path), newWidth, newHeight)
+			if width > limitWidth || img.Size > limitKb*1024 {
+				// Calculate new width based on percentage
+				newWidth := int(float64(width) * percent / 100)
+
+				// Only resize if the new width is different from the original
+				if newWidth != width {
+					// Calculate new height to maintain aspect ratio
+					newHeight := int(float64(height) * float64(newWidth) / float64(width))
+
+					dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+					draw.ApproxBiLinear.Scale(dst, dst.Rect, img.Image, img.Image.Bounds(), draw.Over, nil)
+					img.Image = dst
+					fmt.Printf("Resized  - filename: %s  width:%d  height:%d\n", filepath.Base(img.Path), newWidth, newHeight)
+				}
 
 				out <- img
 			}
-
 		}
 	}()
 
 	return out
 }
 
-func Process(in <-chan ImageInfo) {
+func Save(in <-chan ImageInfo) {
 	var wg sync.WaitGroup
 	for img := range in {
 		wg.Add(1)
