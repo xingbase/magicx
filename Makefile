@@ -16,5 +16,5 @@ unexport TMP_BUILD_VERSION
 BINARY=magicx
 
 build:
-	# CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -installsuffix cgo -o bin/${BINARY} ./cmd/magicx/main.go
-	go build -o bin/${BINARY} ${LDFLAGS} ./cmd/magicx/*.go
+	# GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build -o magicx.exe
+	go build -o bin/${BINARY} ${LDFLAGS}

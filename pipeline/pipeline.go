@@ -1,4 +1,4 @@
-package magicx
+package pipeline
 
 import (
 	"bytes"
@@ -20,6 +20,16 @@ var fileExtentions = map[string]bool{
 	".jpeg": true,
 	".png":  true,
 	".gif":  true,
+}
+
+var ContentTypeByLimitInfo = map[string]LimitSizeInfo{
+	"comic":          {Width: 1600, Size: 20480},
+	"magazine_comic": {Width: 2266, Size: 30720},
+}
+
+type LimitSizeInfo struct {
+	Width int
+	Size  int64
 }
 
 type FileInfo struct {
