@@ -1,6 +1,7 @@
 package magicx
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/gif"
@@ -114,7 +115,7 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 	return out
 }
 
-func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, percent float64) <-chan ImageInfo {
+func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, initialPercent float64) <-chan ImageInfo {
 	out := make(chan ImageInfo)
 
 	go func() {
@@ -125,18 +126,25 @@ func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, percent float64)
 			fmt.Printf("Original - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
 
 			if width > limitWidth || img.Size > limitKb*1024 {
-				// Calculate new width based on percentage
-				newWidth := int(float64(width) * percent / 100)
-
-				// Only resize if the new width is different from the original
-				if newWidth != width {
-					// Calculate new height to maintain aspect ratio
+				percent := initialPercent
+				for percent >= 50 { // Don't go below 50% of original size
+					newWidth := int(float64(width) * percent / 100)
 					newHeight := int(float64(height) * float64(newWidth) / float64(width))
 
 					dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
 					draw.ApproxBiLinear.Scale(dst, dst.Rect, img.Image, img.Image.Bounds(), draw.Over, nil)
-					img.Image = dst
-					fmt.Printf("Resized  - filename: %s  width:%d  height:%d\n", filepath.Base(img.Path), newWidth, newHeight)
+
+					// Encode to JPEG to check file size
+					var buf bytes.Buffer
+					jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85})
+
+					if buf.Len() <= int(limitKb*1024) {
+						img.Image = dst
+						fmt.Printf("Resized  - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), newWidth, newHeight, buf.Len())
+						break
+					}
+
+					percent -= 5 // Reduce by 5% and try again
 				}
 
 				out <- img
