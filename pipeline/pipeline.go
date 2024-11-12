@@ -133,7 +133,7 @@ func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, initialPercent f
 		for img := range in {
 			bounds := img.Image.Bounds()
 			width, height := bounds.Dx(), bounds.Dy()
-			fmt.Printf("Original - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
+			// fmt.Printf("Original - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
 
 			if width > limitWidth || img.Size > limitKb*1024 {
 				percent := initialPercent
@@ -146,7 +146,17 @@ func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, initialPercent f
 
 					// Encode to JPEG to check file size
 					var buf bytes.Buffer
-					jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85})
+					switch img.Format {
+					case "jpeg":
+						jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85})
+					case "png":
+						png.Encode(&buf, dst)
+					case "gif":
+						gif.Encode(&buf, dst, nil)
+					default:
+						fmt.Printf("Unsupported image format: %s\n", img.Format)
+						return
+					}
 
 					if buf.Len() <= int(limitKb*1024) {
 						img.Image = dst
