@@ -23,7 +23,7 @@ var fileExtentions = map[string]bool{
 }
 
 var ContentTypeByLimitInfo = map[string]LimitSizeInfo{
-	"comic":          {Width: 1600, Size: 20480},
+	"comic":          {Width: 1600, Size: 10240},
 	"magazine_comic": {Width: 2266, Size: 30720},
 }
 
@@ -256,4 +256,17 @@ func Save(in <-chan ImageInfo) {
 		}(img)
 	}
 	wg.Wait()
+}
+
+func FormatFileSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
