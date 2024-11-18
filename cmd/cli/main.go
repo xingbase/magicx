@@ -14,7 +14,9 @@ func main() {
 	images := pipeline.CheckImageSize(pipeline.Decode(pipeline.Rename(pipeline.Load(dir), 3)), limitInfo)
 
 	for img := range images {
-		fmt.Printf("%s - %dx%d\n", img.Path, img.Image.Bounds().Dx(), img.Image.Bounds().Dy())
+		if !img.IsStandard {
+			fmt.Printf("%s width: %d, height: %d, size: %d\n", img.Path, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), img.Size)
+		}
 	}
 
 }

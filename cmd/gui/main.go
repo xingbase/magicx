@@ -16,20 +16,8 @@ func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("MagicX")
 
-	folderPathLabel := widget.NewLabel("No folder selected")
-
-	selectFolderBtn := widget.NewButton("Select Folder", func() {
-		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
-			if err != nil {
-				dialog.ShowError(err, myWindow)
-				return
-			}
-			if list == nil {
-				return
-			}
-			folderPathLabel.SetText(list.Path())
-		}, myWindow)
-	})
+	folderPathEntry := widget.NewEntry()
+	folderPathEntry.SetPlaceHolder("Enter folder path")
 
 	contentTypeSelect := widget.NewSelect([]string{"comic", "magazine_comic"}, func(value string) {
 		fmt.Println("Content type selected:", value)
@@ -52,10 +40,10 @@ func main() {
 
 	var runButton *widget.Button
 	runButton = widget.NewButton("Run", func() {
-		folderPath := folderPathLabel.Text
+		folderPath := folderPathEntry.Text
 		contentType := contentTypeSelect.Selected
 		if folderPath == "No folder selected" {
-			dialog.ShowInformation("Error", "Please select a folder first", myWindow)
+			dialog.ShowInformation("Error", "Please enter a folder path", myWindow)
 			return
 		}
 
@@ -98,7 +86,13 @@ func main() {
 			out := pipeline.CheckImageSize(pipeline.Decode(pipeline.Rename(files, renameSuffixN)), limitInfo)
 
 			for img := range out {
-				results.WriteString(fmt.Sprintf("%s\n", img.Path))
+				if img.IsStandard {
+					continue
+				}
+
+				paths := strings.Split(img.Path, "/")
+				name := paths[len(paths)-1]
+				results.WriteString(fmt.Sprintf("%s  (width: %d height: %d size: %d)\n", name, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), img.Size))
 				processedCount++
 				updateProgress()
 			}
@@ -117,9 +111,8 @@ func main() {
 	})
 
 	content := container.NewVBox(
-		widget.NewLabel("Selected Folder:"),
-		folderPathLabel,
-		selectFolderBtn,
+		widget.NewLabel("Folder Path:"),
+		folderPathEntry,
 		widget.NewLabel("Content Type:"),
 		contentTypeSelect,
 		// widget.NewLabel("Reduce size:"),

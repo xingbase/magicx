@@ -39,10 +39,11 @@ type FileInfo struct {
 }
 
 type ImageInfo struct {
-	Path   string
-	Size   int64
-	Image  image.Image
-	Format string
+	Path       string
+	Size       int64
+	Image      image.Image
+	Format     string
+	IsStandard bool
 }
 
 func Load(dir string) <-chan FileInfo {
@@ -106,7 +107,8 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 	go func() {
 		defer close(out)
 		for path := range in {
-			if strings.HasPrefix(path.Name, "tmp") {
+			// skip thumbnail file
+			if strings.Contains(path.Name, "tmb_") {
 				continue
 			}
 
@@ -132,25 +134,38 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 func CheckImageSize(in <-chan ImageInfo, info LimitSizeInfo) <-chan ImageInfo {
 	out := make(chan ImageInfo)
 
-	groupedImages := make(map[string][]ImageInfo)
+	groupedImages := make(map[int][]ImageInfo)
+	widthCounts := make(map[int]int)
+	maxCount := 0
+	standardWidth := 0
 
 	go func() {
 		defer close(out)
 		for img := range in {
 			bounds := img.Image.Bounds()
-			width, height := bounds.Dx(), bounds.Dy()
+			width := bounds.Dx()
 
-			if width > info.Width || img.Size > info.Size*1024 {
-				fmt.Printf("%s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
+			groupedImages[width] = append(groupedImages[width], img)
+			widthCounts[width]++
 
-				key := fmt.Sprintf("%dx%d", width, height)
-				groupedImages[key] = append(groupedImages[key], img)
+			if widthCounts[width] > maxCount {
+				maxCount = widthCounts[width]
+				standardWidth = width
 			}
 		}
 
-		// Send grouped images through the output channel
-		for _, images := range groupedImages {
+		// Process grouped images
+		for width, images := range groupedImages {
+			// width
+			isStandard := (width == standardWidth)
 			for _, img := range images {
+				img.IsStandard = isStandard
+
+				// size
+				if img.Size > info.Size*1024 {
+					img.IsStandard = true
+				}
+
 				out <- img
 			}
 		}
