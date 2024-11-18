@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -36,12 +36,19 @@ func main() {
 	})
 	contentTypeSelect.SetSelected("comic")
 
-	percentEntry := widget.NewEntry()
-	percentEntry.SetText("98.0")
-	percentEntry.SetPlaceHolder("Enter percent (1-100)")
+	// percentEntry := widget.NewEntry()
+	// percentEntry.SetText("98.0")
+	// percentEntry.SetPlaceHolder("Enter percent (1-100)")
 
 	progress := widget.NewProgressBar()
 	progress.Hide()
+
+	resultTextArea := widget.NewMultiLineEntry()
+	// resultTextArea.Disable() // Make it read-only
+
+	// 스크롤 컨테이너에 넣기
+	resultScroll := container.NewScroll(resultTextArea)
+	resultScroll.SetMinSize(fyne.NewSize(800, 300))
 
 	var runButton *widget.Button
 	runButton = widget.NewButton("Run", func() {
@@ -52,17 +59,19 @@ func main() {
 			return
 		}
 
-		percent, err := strconv.ParseFloat(percentEntry.Text, 64)
-		if err != nil || percent < 1 || percent > 100 {
-			dialog.ShowInformation("Error", "Please enter a valid percent value (1-100)", myWindow)
-			return
-		}
+		// percent, err := strconv.ParseFloat(percentEntry.Text, 64)
+		// if err != nil || percent < 1 || percent > 100 {
+		// 	dialog.ShowInformation("Error", "Please enter a valid percent value (1-100)", myWindow)
+		// 	return
+		// }
 
-		fmt.Printf("Processing folder: %s as %s with percent: %.2f%%\n", folderPath, contentType, percent)
+		// fmt.Printf("Processing folder: %s as %s with percent: %.2f%%\n", folderPath, contentType, percent)
+		fmt.Printf("Processing folder: %s as %s\n", folderPath, contentType)
 
 		runButton.Disable()
 		progress.Show()
 		progress.SetValue(0)
+		resultTextArea.SetText("") // Clear previous results
 
 		go func() {
 			var renameSuffixN = 3 // suffix file with number
@@ -84,26 +93,18 @@ func main() {
 				progress.SetValue(float64(processedCount) / float64(fileCount))
 			}
 
-			pipeline.Save( // save image file
-				pipeline.Resize( // resize image file
-					pipeline.Decode( // decode image file
-						pipeline.Rename( // rename image file
-							files,
-							renameSuffixN,
-						),
-					),
-					limitInfo.Width,
-					limitInfo.Size,
-					percent,
-				),
-			)
+			var results strings.Builder
 
-			for range files {
+			out := pipeline.CheckImageSize(pipeline.Decode(pipeline.Rename(files, renameSuffixN)), limitInfo)
+
+			for img := range out {
+				results.WriteString(fmt.Sprintf("%s\n", img.Path))
 				processedCount++
 				updateProgress()
 			}
 
 			myWindow.Canvas().Content().Refresh()
+			resultTextArea.SetText(results.String()) // Set the results in the textarea
 			dialog.ShowInformation("Complete", "MagicX processing has been completed.", myWindow)
 			runButton.Enable()
 			progress.Hide()
@@ -121,10 +122,12 @@ func main() {
 		selectFolderBtn,
 		widget.NewLabel("Content Type:"),
 		contentTypeSelect,
-		widget.NewLabel("Reduce size:"),
-		percentEntry,
+		// widget.NewLabel("Reduce size:"),
+		// percentEntry,
 		runButton,
 		progress,
+		widget.NewLabel("Results:"),
+		resultScroll,
 	)
 
 	myWindow.SetContent(content)

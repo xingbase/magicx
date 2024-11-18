@@ -106,6 +106,10 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 	go func() {
 		defer close(out)
 		for path := range in {
+			if strings.HasPrefix(path.Name, "tmp") {
+				continue
+			}
+
 			file, err := os.Open(path.Name)
 			if err != nil {
 				fmt.Printf("Error opening file %v\n", err)
@@ -125,7 +129,37 @@ func Decode(in <-chan FileInfo) <-chan ImageInfo {
 	return out
 }
 
-func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, initialPercent float64) <-chan ImageInfo {
+func CheckImageSize(in <-chan ImageInfo, info LimitSizeInfo) <-chan ImageInfo {
+	out := make(chan ImageInfo)
+
+	groupedImages := make(map[string][]ImageInfo)
+
+	go func() {
+		defer close(out)
+		for img := range in {
+			bounds := img.Image.Bounds()
+			width, height := bounds.Dx(), bounds.Dy()
+
+			if width > info.Width || img.Size > info.Size*1024 {
+				fmt.Printf("%s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
+
+				key := fmt.Sprintf("%dx%d", width, height)
+				groupedImages[key] = append(groupedImages[key], img)
+			}
+		}
+
+		// Send grouped images through the output channel
+		for _, images := range groupedImages {
+			for _, img := range images {
+				out <- img
+			}
+		}
+	}()
+
+	return out
+}
+
+func Resize(in <-chan ImageInfo, info LimitSizeInfo, initialPercent float64) <-chan ImageInfo {
 	out := make(chan ImageInfo)
 
 	go func() {
@@ -135,7 +169,7 @@ func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, initialPercent f
 			width, height := bounds.Dx(), bounds.Dy()
 			// fmt.Printf("Original - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
 
-			if width > limitWidth || img.Size > limitKb*1024 {
+			if width > info.Width || img.Size > info.Size*1024 {
 				percent := initialPercent
 				for percent >= 50 { // Don't go below 50% of original size
 					newWidth := int(float64(width) * percent / 100)
@@ -158,7 +192,7 @@ func Resize(in <-chan ImageInfo, limitWidth int, limitKb int64, initialPercent f
 						return
 					}
 
-					if buf.Len() <= int(limitKb*1024) {
+					if buf.Len() <= int(info.Size*1024) {
 						img.Image = dst
 						fmt.Printf("Resized  - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), newWidth, newHeight, buf.Len())
 						break
