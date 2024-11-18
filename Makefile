@@ -15,6 +15,10 @@ unexport TMP_BUILD_VERSION
 
 BINARY=magicx
 
-build:
-	# GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build -o magicx.exe
-	go build -o bin/${BINARY} ${LDFLAGS}
+build: window_build macox_build
+
+window_build:
+	CGO_ENABLED=1 GODEBUG=cgocheck=0 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc go build -v -o bin/${BINARY}.exe ./cmd/gui/main.go
+
+macox_build:
+	go build -o bin/${BINARY} ${LDFLAGS} ./cmd/gui/main.go
