@@ -85,14 +85,23 @@ func main() {
 
 			out := pipeline.CheckImageSize(pipeline.Decode(pipeline.Rename(files, renameSuffixN)), limitInfo)
 
+			missmatchFolders := make(map[string]struct{})
 			for img := range out {
 				if img.IsStandard {
 					continue
+				}
+				if img.IsMissmatch {
+					missmatchFolders[img.Path] = struct{}{}
 				}
 
 				results.WriteString(fmt.Sprintf("%s  (width: %d height: %d size: %s)\n", img.Name, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), pipeline.FormatFileSize(img.Size)))
 				processedCount++
 				updateProgress()
+			}
+
+			// show missmatch folders
+			for folder := range missmatchFolders {
+				results.WriteString(fmt.Sprintf("%s  (Missmatch)\n", folder))
 			}
 
 			myWindow.Canvas().Content().Refresh()
