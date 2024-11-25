@@ -15,7 +15,7 @@ import (
 	"golang.org/x/image/draw"
 )
 
-var fileExtentions = map[string]bool{
+var fileExtensions = map[string]bool{
 	".jpg":  true,
 	".jpeg": true,
 	".png":  true,
@@ -33,6 +33,7 @@ type LimitSizeInfo struct {
 }
 
 type FileInfo struct {
+	Path string
 	Name string
 	Ext  string
 	Size int64
@@ -40,133 +41,191 @@ type FileInfo struct {
 
 type ImageInfo struct {
 	Path       string
+	Name       string
 	Size       int64
 	Image      image.Image
 	Format     string
 	IsStandard bool
 }
 
-func Load(dir string) <-chan FileInfo {
-	out := make(chan FileInfo)
+func Load(dir string) <-chan map[string][]FileInfo {
+	out := make(chan map[string][]FileInfo)
 
 	go func() {
 		defer close(out)
-		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+
+		files := make(map[string][]FileInfo)
+
+		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
+
 			if !info.IsDir() {
 				ext := strings.ToLower(filepath.Ext(path))
-				if fileExtentions[ext] {
-					out <- FileInfo{Name: path, Ext: ext, Size: info.Size()}
+				if fileExtensions[ext] {
+					relPath, _ := filepath.Rel(dir, filepath.Dir(path))
+					fileInfo := FileInfo{
+						Path: path,
+						Name: info.Name(),
+						Ext:  ext,
+						Size: info.Size(),
+					}
+					files[relPath] = append(files[relPath], fileInfo)
 				}
-
 			}
 			return nil
 		})
+
+		if err != nil {
+			fmt.Println("Error walking through directory:", err)
+		}
+
+		out <- files
 	}()
 
 	return out
 }
 
-func Rename(in <-chan FileInfo, n int) <-chan FileInfo {
-	out := make(chan FileInfo)
+func Rename(in <-chan map[string][]FileInfo, n int) <-chan map[string][]FileInfo {
+	out := make(chan map[string][]FileInfo)
 
 	go func() {
 		defer close(out)
 
-		for file := range in {
-			parts := strings.Split(file.Name, "_")
+		for fileMap := range in {
+			newFileMap := make(map[string][]FileInfo)
 
-			num := strings.TrimSuffix(parts[len(parts)-1], file.Ext)
+			for dir, files := range fileMap {
+				newFiles := make([]FileInfo, 0, len(files))
 
-			if len(num) < 3 {
-				newNum := fmt.Sprintf("%03s", num)
+				for _, file := range files {
+					parts := strings.Split(file.Path, "_")
+					if len(parts) > 0 {
+						num := strings.TrimSuffix(parts[len(parts)-1], file.Ext)
 
-				newFile := strings.Replace(file.Name, num+file.Ext, newNum+file.Ext, 1)
+						if len(num) < n {
+							newNum := fmt.Sprintf("%0*s", n, num)
+							newName := strings.TrimSuffix(file.Name, file.Ext) + newNum + file.Ext
+							newFile := strings.Replace(file.Path, num+file.Ext, newNum+file.Ext, 1)
 
-				err := os.Rename(file.Name, newFile)
-				if err != nil {
-					fmt.Printf("Error rename file %s: %v\n", file.Name, err)
-					continue
+							err := os.Rename(file.Path, newFile)
+							if err != nil {
+								fmt.Printf("Error rename file %s: %v\n", file.Name, err)
+								newFiles = append(newFiles, file) // Keep original file info if rename fails
+								continue
+							}
+
+							file.Name = newName
+							file.Path = newFile
+						}
+					}
+					newFiles = append(newFiles, file)
 				}
 
-				file.Name = newFile
+				newFileMap[dir] = newFiles
 			}
 
-			out <- file
+			out <- newFileMap
 		}
 	}()
 
 	return out
 }
 
-func Decode(in <-chan FileInfo) <-chan ImageInfo {
+func Decode(in <-chan map[string][]FileInfo) <-chan map[string][]ImageInfo {
+	out := make(chan map[string][]ImageInfo)
+
+	go func() {
+		defer close(out)
+		for dirMap := range in {
+			resultMap := make(map[string][]ImageInfo)
+
+			for dir, files := range dirMap {
+				var imageInfos []ImageInfo
+
+				for _, fileInfo := range files {
+					// skip thumbnail file
+					if strings.Contains(fileInfo.Name, "tmb_") {
+						continue
+					}
+
+					file, err := os.Open(fileInfo.Path)
+					if err != nil {
+						fmt.Printf("Error opening file %s: %v\n", fileInfo.Path, err)
+						continue
+					}
+
+					img, format, err := image.Decode(file)
+					file.Close()
+					if err != nil {
+						fmt.Printf("Error decoding image %s: %v\n", fileInfo.Path, err)
+						continue
+					}
+
+					imageInfos = append(imageInfos, ImageInfo{
+						Path:   fileInfo.Path,
+						Name:   fileInfo.Name,
+						Size:   fileInfo.Size,
+						Image:  img,
+						Format: format,
+					})
+				}
+
+				if len(imageInfos) > 0 {
+					resultMap[dir] = imageInfos
+				}
+			}
+
+			if len(resultMap) > 0 {
+				out <- resultMap
+			}
+		}
+	}()
+
+	return out
+}
+
+func CheckImageSize(in <-chan map[string][]ImageInfo, info LimitSizeInfo) <-chan ImageInfo {
 	out := make(chan ImageInfo)
 
 	go func() {
 		defer close(out)
-		for path := range in {
-			// skip thumbnail file
-			if strings.Contains(path.Name, "tmb_") {
-				continue
-			}
 
-			file, err := os.Open(path.Name)
-			if err != nil {
-				fmt.Printf("Error opening file %v\n", err)
-			}
+		for dirs := range in {
+			for _, images := range dirs {
+				groupedImages := make(map[int][]ImageInfo)
+				widthCounts := make(map[int]int)
+				maxCount := 0
+				standardWidth := 0
 
-			img, format, err := image.Decode(file)
-			file.Close()
-			if err != nil {
-				fmt.Printf("Error decoding image %v\n", err)
-				continue
-			}
+				// First pass: group images and count widths
+				for _, img := range images {
+					width := img.Image.Bounds().Dx()
+					groupedImages[width] = append(groupedImages[width], img)
+					widthCounts[width]++
 
-			out <- ImageInfo{Path: path.Name, Size: path.Size, Image: img, Format: format}
-		}
-	}()
-
-	return out
-}
-
-func CheckImageSize(in <-chan ImageInfo, info LimitSizeInfo) <-chan ImageInfo {
-	out := make(chan ImageInfo)
-
-	groupedImages := make(map[int][]ImageInfo)
-	widthCounts := make(map[int]int)
-	maxCount := 0
-	standardWidth := 0
-
-	go func() {
-		defer close(out)
-		for img := range in {
-			bounds := img.Image.Bounds()
-			width := bounds.Dx()
-
-			groupedImages[width] = append(groupedImages[width], img)
-			widthCounts[width]++
-
-			if widthCounts[width] > maxCount {
-				maxCount = widthCounts[width]
-				standardWidth = width
-			}
-		}
-
-		// Process grouped images
-		for width, images := range groupedImages {
-			// width
-			isStandard := (width == standardWidth)
-			for _, img := range images {
-				img.IsStandard = isStandard
-
-				// size
-				if img.Size > info.Size*1024 {
-					img.IsStandard = true
+					if widthCounts[width] > maxCount {
+						maxCount = widthCounts[width]
+						standardWidth = width
+					}
 				}
 
-				out <- img
+				// Second pass: process and send images
+				for width, imgs := range groupedImages {
+					isStandard := (width == standardWidth)
+					for _, img := range imgs {
+						processedImg := img
+						processedImg.IsStandard = isStandard
+
+						// size check
+						if img.Size > info.Size*1024 {
+							processedImg.IsStandard = true
+						}
+
+						out <- processedImg
+					}
+				}
 			}
 		}
 	}()
