@@ -7,8 +7,11 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -33,19 +36,23 @@ type LimitSizeInfo struct {
 }
 
 type FileInfo struct {
-	Path string
-	Name string
-	Ext  string
-	Size int64
+	Full        string
+	Path        string
+	Name        string
+	Ext         string
+	Size        int64
+	IsMissmatch bool
 }
 
 type ImageInfo struct {
-	Path       string
-	Name       string
-	Size       int64
-	Image      image.Image
-	Format     string
-	IsStandard bool
+	Full        string
+	Path        string
+	Name        string
+	Size        int64
+	Image       image.Image
+	Format      string
+	IsStandard  bool
+	IsMissmatch bool
 }
 
 func Load(dir string) <-chan map[string][]FileInfo {
@@ -65,11 +72,22 @@ func Load(dir string) <-chan map[string][]FileInfo {
 				ext := strings.ToLower(filepath.Ext(path))
 				if fileExtensions[ext] {
 					relPath, _ := filepath.Rel(dir, filepath.Dir(path))
+
+					parts := strings.Split(relPath, "/")
+					lastFolder := parts[len(parts)-1]
+
+					folderN, _ := extractChapterFromFolderName(lastFolder)
+					fileN, _ := extractChapterFromFileName(info.Name())
+
+					log.Println("relPath: ", relPath, ", FileName: ", info.Name(), ", FolderNum: ", folderN, ", FileNum: ", fileN)
+
 					fileInfo := FileInfo{
-						Path: path,
-						Name: info.Name(),
-						Ext:  ext,
-						Size: info.Size(),
+						Full:        path,
+						Path:        lastFolder,
+						Name:        info.Name(),
+						Ext:         ext,
+						Size:        info.Size(),
+						IsMissmatch: folderN != fileN,
 					}
 					files[relPath] = append(files[relPath], fileInfo)
 				}
@@ -100,16 +118,16 @@ func Rename(in <-chan map[string][]FileInfo, n int) <-chan map[string][]FileInfo
 				newFiles := make([]FileInfo, 0, len(files))
 
 				for _, file := range files {
-					parts := strings.Split(file.Path, "_")
+					parts := strings.Split(file.Full, "_")
 					if len(parts) > 0 {
 						num := strings.TrimSuffix(parts[len(parts)-1], file.Ext)
 
 						if len(num) < n {
 							newNum := fmt.Sprintf("%0*s", n, num)
 							newName := strings.TrimSuffix(file.Name, file.Ext) + newNum + file.Ext
-							newFile := strings.Replace(file.Path, num+file.Ext, newNum+file.Ext, 1)
+							newFile := strings.Replace(file.Full, num+file.Ext, newNum+file.Ext, 1)
 
-							err := os.Rename(file.Path, newFile)
+							err := os.Rename(file.Full, newFile)
 							if err != nil {
 								fmt.Printf("Error rename file %s: %v\n", file.Name, err)
 								newFiles = append(newFiles, file) // Keep original file info if rename fails
@@ -117,7 +135,7 @@ func Rename(in <-chan map[string][]FileInfo, n int) <-chan map[string][]FileInfo
 							}
 
 							file.Name = newName
-							file.Path = newFile
+							file.Full = newFile
 						}
 					}
 					newFiles = append(newFiles, file)
@@ -150,25 +168,27 @@ func Decode(in <-chan map[string][]FileInfo) <-chan map[string][]ImageInfo {
 						continue
 					}
 
-					file, err := os.Open(fileInfo.Path)
+					file, err := os.Open(fileInfo.Full)
 					if err != nil {
-						fmt.Printf("Error opening file %s: %v\n", fileInfo.Path, err)
+						fmt.Printf("Error opening file %s: %v\n", fileInfo.Full, err)
 						continue
 					}
 
 					img, format, err := image.Decode(file)
 					file.Close()
 					if err != nil {
-						fmt.Printf("Error decoding image %s: %v\n", fileInfo.Path, err)
+						fmt.Printf("Error decoding image %s: %v\n", fileInfo.Full, err)
 						continue
 					}
 
 					imageInfos = append(imageInfos, ImageInfo{
-						Path:   fileInfo.Path,
-						Name:   fileInfo.Name,
-						Size:   fileInfo.Size,
-						Image:  img,
-						Format: format,
+						Full:        fileInfo.Full,
+						Path:        fileInfo.Path,
+						Name:        fileInfo.Name,
+						Size:        fileInfo.Size,
+						Image:       img,
+						Format:      format,
+						IsMissmatch: fileInfo.IsMissmatch,
 					})
 				}
 
@@ -328,4 +348,36 @@ func FormatFileSize(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// extractChapterFromFolderName extracts the chapter number from the folder name.
+func extractChapterFromFolderName(s string) (int, error) {
+	re := regexp.MustCompile(`^(\d+)_`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("invalid folder name format")
+	}
+
+	n, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
+// extractChapterFromFileName extracts the chapter number from the file name.
+func extractChapterFromFileName(s string) (int, error) {
+	re := regexp.MustCompile(`_(\d{4})_`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("invalid file name format")
+	}
+
+	n, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
 }
