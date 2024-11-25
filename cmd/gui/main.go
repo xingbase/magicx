@@ -90,9 +90,7 @@ func main() {
 					continue
 				}
 
-				paths := strings.Split(img.Path, "/")
-				name := paths[len(paths)-1]
-				results.WriteString(fmt.Sprintf("%s  (width: %d height: %d size: %s)\n", name, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), pipeline.FormatFileSize(img.Size)))
+				results.WriteString(fmt.Sprintf("%s  (width: %d height: %d size: %s)\n", img.Name, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), pipeline.FormatFileSize(img.Size)))
 				processedCount++
 				updateProgress()
 			}
