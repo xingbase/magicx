@@ -18,7 +18,7 @@ BINARY=magicx
 build: window_build macox_build
 
 window_build:
-	CGO_ENABLED=1 GODEBUG=cgocheck=0 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc go build -v -o bin/${BINARY}_v1.2.0.exe ./cmd/gui/main.go
+	CGO_ENABLED=1 GODEBUG=cgocheck=0 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc go build -v -o bin/${BINARY}_v1.2.1.exe ./cmd/gui/main.go
 
 macox_build:
-	go build -o bin/${BINARY}_v1.2.0 ${LDFLAGS} ./cmd/gui/main.go
+	go build -o bin/${BINARY}_v1.2.1 ${LDFLAGS} ./cmd/gui/main.go
