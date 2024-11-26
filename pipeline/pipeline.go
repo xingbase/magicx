@@ -1,21 +1,13 @@
 package pipeline
 
 import (
-	"bytes"
 	"fmt"
 	"image"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
-
-	"golang.org/x/image/draw"
 )
 
 var fileExtensions = map[string]bool{
@@ -26,11 +18,27 @@ var fileExtensions = map[string]bool{
 }
 
 var ContentTypeByLimitInfo = map[string]LimitSizeInfo{
-	"comic":          {Width: 1600, Size: 10240},
-	"magazine_comic": {Width: 2266, Size: 30720},
+	"comic": {
+		Image:     ImageSize{Width: 1600, Size: 10240},
+		Thumbnail: ThumbnailSize{Width: 500, Size: 512},
+	},
+	"magazine_comic": {
+		Image:     ImageSize{Width: 2266, Size: 30720},
+		Thumbnail: ThumbnailSize{Width: 500, Size: 512},
+	},
 }
 
 type LimitSizeInfo struct {
+	Image     ImageSize
+	Thumbnail ThumbnailSize
+}
+
+type ImageSize struct {
+	Width int
+	Size  int64
+}
+
+type ThumbnailSize struct {
 	Width int
 	Size  int64
 }
@@ -53,6 +61,7 @@ type ImageInfo struct {
 	Format      string
 	IsStandard  bool
 	IsMissmatch bool
+	IsThumbnail bool
 }
 
 func Load(dir string) <-chan map[string][]FileInfo {
@@ -78,8 +87,6 @@ func Load(dir string) <-chan map[string][]FileInfo {
 
 					folderN, _ := extractChapterFromFolderName(lastFolder)
 					fileN, _ := extractChapterFromFileName(info.Name())
-
-					log.Println("relPath: ", relPath, ", FileName: ", info.Name(), ", FolderNum: ", folderN, ", FileNum: ", fileN)
 
 					fileInfo := FileInfo{
 						Full:        path,
@@ -163,11 +170,6 @@ func Decode(in <-chan map[string][]FileInfo) <-chan map[string][]ImageInfo {
 				var imageInfos []ImageInfo
 
 				for _, fileInfo := range files {
-					// skip thumbnail file
-					if strings.Contains(fileInfo.Name, "tmb_") {
-						continue
-					}
-
 					file, err := os.Open(fileInfo.Full)
 					if err != nil {
 						fmt.Printf("Error opening file %s: %v\n", fileInfo.Full, err)
@@ -176,6 +178,7 @@ func Decode(in <-chan map[string][]FileInfo) <-chan map[string][]ImageInfo {
 
 					img, format, err := image.Decode(file)
 					file.Close()
+
 					if err != nil {
 						fmt.Printf("Error decoding image %s: %v\n", fileInfo.Full, err)
 						continue
@@ -189,6 +192,8 @@ func Decode(in <-chan map[string][]FileInfo) <-chan map[string][]ImageInfo {
 						Image:       img,
 						Format:      format,
 						IsMissmatch: fileInfo.IsMissmatch,
+						IsThumbnail: strings.Contains(fileInfo.Name, "tmb_"),
+						IsStandard:  true,
 					})
 				}
 
@@ -206,11 +211,11 @@ func Decode(in <-chan map[string][]FileInfo) <-chan map[string][]ImageInfo {
 	return out
 }
 
-func CheckImageSize(in <-chan map[string][]ImageInfo, info LimitSizeInfo) <-chan ImageInfo {
+func CheckImage(in <-chan map[string][]ImageInfo, info LimitSizeInfo) <-chan ImageInfo {
 	out := make(chan ImageInfo)
 
 	go func() {
-		defer close(out)
+		defer close(out) // Ensure the channel is closed when done
 
 		for dirs := range in {
 			for _, images := range dirs {
@@ -219,28 +224,38 @@ func CheckImageSize(in <-chan map[string][]ImageInfo, info LimitSizeInfo) <-chan
 				maxCount := 0
 				standardWidth := 0
 
-				// First pass: group images and count widths
+				// First pass: Group images by width and find the most common width
 				for _, img := range images {
-					width := img.Image.Bounds().Dx()
-					groupedImages[width] = append(groupedImages[width], img)
-					widthCounts[width]++
+					if img.IsThumbnail {
+						// Process thumbnail image
+						processedImg := img
+						if img.Size > info.Thumbnail.Size*1024 {
+							processedImg.IsStandard = false
+							out <- processedImg
+						}
+					} else {
+						// Group non-thumbnail images by width
+						width := img.Image.Bounds().Dx()
+						groupedImages[width] = append(groupedImages[width], img)
+						widthCounts[width]++
 
-					if widthCounts[width] > maxCount {
-						maxCount = widthCounts[width]
-						standardWidth = width
+						if widthCounts[width] > maxCount {
+							maxCount = widthCounts[width]
+							standardWidth = width
+						}
 					}
 				}
 
-				// Second pass: process and send images
+				// Second pass: Process grouped images and determine if they are standard
 				for width, imgs := range groupedImages {
-					isStandard := (width == standardWidth)
+					isStandardWidth := (width == standardWidth)
 					for _, img := range imgs {
 						processedImg := img
-						processedImg.IsStandard = isStandard
+						processedImg.IsStandard = isStandardWidth
 
-						// size check
-						if img.Size > info.Size*1024 {
-							processedImg.IsStandard = true
+						// Check size against limit
+						if img.Size > info.Image.Size*1024 {
+							processedImg.IsStandard = false
 						}
 
 						out <- processedImg
@@ -251,90 +266,6 @@ func CheckImageSize(in <-chan map[string][]ImageInfo, info LimitSizeInfo) <-chan
 	}()
 
 	return out
-}
-
-func Resize(in <-chan ImageInfo, info LimitSizeInfo, initialPercent float64) <-chan ImageInfo {
-	out := make(chan ImageInfo)
-
-	go func() {
-		defer close(out)
-		for img := range in {
-			bounds := img.Image.Bounds()
-			width, height := bounds.Dx(), bounds.Dy()
-			// fmt.Printf("Original - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), width, height, img.Size)
-
-			if width > info.Width || img.Size > info.Size*1024 {
-				percent := initialPercent
-				for percent >= 50 { // Don't go below 50% of original size
-					newWidth := int(float64(width) * percent / 100)
-					newHeight := int(float64(height) * float64(newWidth) / float64(width))
-
-					dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
-					draw.ApproxBiLinear.Scale(dst, dst.Rect, img.Image, img.Image.Bounds(), draw.Over, nil)
-
-					// Encode to JPEG to check file size
-					var buf bytes.Buffer
-					switch img.Format {
-					case "jpeg":
-						jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85})
-					case "png":
-						png.Encode(&buf, dst)
-					case "gif":
-						gif.Encode(&buf, dst, nil)
-					default:
-						fmt.Printf("Unsupported image format: %s\n", img.Format)
-						return
-					}
-
-					if buf.Len() <= int(info.Size*1024) {
-						img.Image = dst
-						fmt.Printf("Resized  - filename: %s  width:%d  height:%d  size:%d\n", filepath.Base(img.Path), newWidth, newHeight, buf.Len())
-						break
-					}
-
-					percent -= 5 // Reduce by 5% and try again
-				}
-
-				out <- img
-			}
-		}
-	}()
-
-	return out
-}
-
-func Save(in <-chan ImageInfo) {
-	var wg sync.WaitGroup
-	for img := range in {
-		wg.Add(1)
-		go func(img ImageInfo) {
-			defer wg.Done()
-			outFile, err := os.Create(img.Path)
-			if err != nil {
-				fmt.Printf("Error creating file %s: %v\n", img.Path, err)
-				return
-			}
-			defer outFile.Close()
-
-			var encodeErr error
-			switch img.Format {
-			case "jpeg":
-				encodeErr = jpeg.Encode(outFile, img.Image, nil)
-			case "png":
-				encodeErr = png.Encode(outFile, img.Image)
-			case "gif":
-				encodeErr = gif.Encode(outFile, img.Image, nil)
-			default:
-				fmt.Printf("Unsupported image format: %s\n", img.Format)
-				return
-			}
-
-			if encodeErr != nil {
-				fmt.Printf("Error encoding image %s: %v\n", img.Path, encodeErr)
-			}
-		}(img)
-	}
-	wg.Wait()
 }
 
 func FormatFileSize(bytes int64) string {
