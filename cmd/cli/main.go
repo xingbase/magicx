@@ -11,7 +11,7 @@ func main() {
 
 	limitInfo := pipeline.ContentTypeByLimitInfo["comic"]
 
-	images := pipeline.CheckImageSize(pipeline.Decode(pipeline.Rename(pipeline.Load(dir), 3)), limitInfo)
+	images := pipeline.CheckImage(pipeline.Decode(pipeline.Rename(pipeline.Load(dir), 3)), limitInfo)
 
 	missmatchFolders := make(map[string]struct{})
 	for img := range images {
