@@ -20,11 +20,11 @@ var fileExtensions = map[string]bool{
 var ContentTypeByLimitInfo = map[string]LimitSizeInfo{
 	"comic": {
 		Image:     ImageSize{Width: 1600, Size: 10240},
-		Thumbnail: ThumbnailSize{Width: 500, Size: 512},
+		Thumbnail: ThumbnailSize{Width: 500, Size: 51200},
 	},
 	"magazine_comic": {
 		Image:     ImageSize{Width: 2266, Size: 30720},
-		Thumbnail: ThumbnailSize{Width: 500, Size: 512},
+		Thumbnail: ThumbnailSize{Width: 500, Size: 51200},
 	},
 }
 
@@ -229,7 +229,7 @@ func CheckImage(in <-chan map[string][]ImageInfo, info LimitSizeInfo) <-chan Ima
 					if img.IsThumbnail {
 						// Process thumbnail image
 						processedImg := img
-						if img.Size > info.Thumbnail.Size*1024 {
+						if img.Size > info.Thumbnail.Size {
 							processedImg.IsStandard = false
 							out <- processedImg
 						}
