@@ -2,19 +2,19 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/xingbase/magicx/pipeline"
+	"github.com/xingbase/magicx"
+	"github.com/xingbase/magicx/file"
 )
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("MagicX")
+	myWindow := myApp.NewWindow("MagicX v1.2.4")
 
 	folderPathEntry := widget.NewEntry()
 	folderPathEntry.SetPlaceHolder("Enter folder path")
@@ -47,58 +47,73 @@ func main() {
 		resultTextArea.SetText("") // Clear previous results
 
 		go func() {
-			var renameSuffixN = 3 // suffix file with number
-			limitInfo := pipeline.ContentTypeByLimitInfo[contentType]
+			output := magicx.Reanme(magicx.Load(folderPath))
 
-			// start pipeline
-			files := pipeline.Load(folderPath)
+			limited := magicx.LimitedSizeInfoByContentType[contentType]
 
-			var results strings.Builder
+			folders := make(map[string]struct{}, 0)
+			images := make(map[string]struct{}, 0)
+			thumbs := make(map[string]struct{}, 0)
+			mismatch := make(map[string]struct{}, 0)
 
-			out := pipeline.CheckImage(pipeline.Decode(pipeline.Rename(files, renameSuffixN)), limitInfo)
+			for folderInfos := range output {
+				for i := range folderInfos {
+					n, _ := file.ExtractFolderNum(folderInfos[i].Name)
+					episodeName := magicx.EpisodeName(n, magicx.JP)
 
-			mismatchFolders := make(map[string]struct{})
-			images := make([]pipeline.ImageInfo, 0)
-			thumbs := make([]pipeline.ImageInfo, 0)
+					if folderInfos[i].Size > limited.Folder {
+						folders[episodeName] = struct{}{}
+					}
 
-			for img := range out {
-				if img.IsStandard {
-					continue
+					groupedImages := make(map[int][]magicx.FileInfo)
+					widthCounts := make(map[int]int)
+					maxCount := 0
+					standardWidth := 0
+
+					for _, f := range folderInfos[i].Files {
+						if f.IsMissmatch {
+							mismatch[episodeName] = struct{}{}
+						}
+
+						if f.IsThumbnail {
+							if f.Size > limited.Thumbnail.Size {
+								thumbs[episodeName] = struct{}{}
+							}
+						} else {
+							// First pass: Group images by width and find the most common width
+							width := f.Width
+							groupedImages[width] = append(groupedImages[width], f)
+							widthCounts[width]++
+
+							if widthCounts[width] > maxCount {
+								maxCount = widthCounts[width]
+								standardWidth = width
+							}
+						}
+					}
+
+					// Second pass: Process grouped images and determine if they are standard
+					for width, imgs := range groupedImages {
+						isStandardWidth := (width == standardWidth)
+						for _, img := range imgs {
+							processedImg := img
+							processedImg.IsStandard = isStandardWidth
+
+							// Check size against limit
+							if img.Size > limited.Image.Size {
+								processedImg.IsStandard = false
+							}
+
+							if !processedImg.IsStandard {
+								images[episodeName] = struct{}{}
+							}
+						}
+					}
 				}
-				if img.IsMissmatch {
-					mismatchFolders[img.Path] = struct{}{}
-				}
-				if img.IsThumbnail {
-					thumbs = append(thumbs, img)
-				} else {
-					images = append(images, img)
-				}
-			}
-
-			if len(thumbs) > 0 {
-				results.WriteString("\n### THUMBNAIL \n")
-			}
-			for _, img := range thumbs {
-				results.WriteString(fmt.Sprintf("%s  (width: %d height: %d size: %s)\n", img.Name, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), pipeline.FormatFileSize(img.Size)))
-			}
-
-			if len(images) > 0 {
-				results.WriteString("\n### IMAGE \n")
-			}
-			for _, img := range images {
-				results.WriteString(fmt.Sprintf("%s  (width: %d height: %d size: %s)\n", img.Name, img.Image.Bounds().Dx(), img.Image.Bounds().Dy(), pipeline.FormatFileSize(img.Size)))
-			}
-
-			// show missmatch folders
-			if len(mismatchFolders) > 0 {
-				results.WriteString("\n### FOLDER / FILE MISMATCH \n")
-			}
-			for folder := range mismatchFolders {
-				results.WriteString(fmt.Sprintln(folder))
 			}
 
 			myWindow.Canvas().Content().Refresh()
-			resultTextArea.SetText(results.String()) // Set the results in the textarea
+			resultTextArea.SetText(magicx.ConsoleLog(folders, images, thumbs, mismatch)) // Set the results in the textarea
 			dialog.ShowInformation("Complete", "MagicX processing has been completed.", myWindow)
 			runButton.Enable()
 
