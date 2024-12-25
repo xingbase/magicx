@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	dir := "/Users/JP17278/Downloads/7153"
+	dir := "/Users/JP17278/Downloads/data"
 
 	result := magicx.Reanme(magicx.Load(dir))
 
@@ -20,11 +20,19 @@ func main() {
 	images := make(map[string]struct{}, 0)
 	thumbs := make(map[string]struct{}, 0)
 	mismatch := make(map[string]struct{}, 0)
+	notFoundThumbs := make(map[string]struct{}, 0)
+	notNumberings := make(map[string]struct{}, 0)
 
 	for folderInfos := range result {
 		for i := range folderInfos {
 			n, _ := file.ExtractFolderNum(folderInfos[i].Name)
+			if n == 0 {
+				continue
+			}
+
 			episodeName := magicx.EpisodeName(n, magicx.JP)
+
+			notFoundThumbs[episodeName] = struct{}{}
 
 			if folderInfos[i].Size > limited.Folder {
 				folders[episodeName] = struct{}{}
@@ -35,6 +43,8 @@ func main() {
 			maxCount := 0
 			standardWidth := 0
 
+			imageFileNums := []int{}
+
 			for _, f := range folderInfos[i].Files {
 				if f.IsMissmatch {
 					mismatch[episodeName] = struct{}{}
@@ -44,6 +54,8 @@ func main() {
 					if f.Size > limited.Thumbnail.Size {
 						thumbs[episodeName] = struct{}{}
 					}
+
+					delete(notFoundThumbs, episodeName)
 				} else {
 					width := f.Width
 					groupedImages[width] = append(groupedImages[width], f)
@@ -53,7 +65,14 @@ func main() {
 						maxCount = widthCounts[width]
 						standardWidth = width
 					}
+
+					fileN, _ := file.ExtractFileNum(f.Name)
+					imageFileNums = append(imageFileNums, fileN)
 				}
+			}
+
+			if !file.IsConsecutive(imageFileNums) {
+				notNumberings[episodeName] = struct{}{}
 			}
 
 			// Second pass: Process grouped images and determine if they are standard
@@ -80,4 +99,7 @@ func main() {
 	magicx.Println("1話内で横幅が統一されていない話", images)
 	magicx.Println("話サムネの容量が50KB以上になっていた話", thumbs)
 	magicx.Println("フォルダ名とファイル名一致していない話", mismatch)
+	magicx.Println("サムネがない話", notFoundThumbs)
+	magicx.Println("ページ表記が順番でなってない話", notNumberings)
+
 }

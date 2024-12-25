@@ -14,7 +14,7 @@ import (
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("MagicX v1.2.4")
+	myWindow := myApp.NewWindow("MagicX v1.2.6")
 
 	folderPathEntry := widget.NewEntry()
 	folderPathEntry.SetPlaceHolder("Enter folder path")
@@ -55,11 +55,19 @@ func main() {
 			images := make(map[string]struct{}, 0)
 			thumbs := make(map[string]struct{}, 0)
 			mismatch := make(map[string]struct{}, 0)
+			notFoundThumbs := make(map[string]struct{}, 0)
+			noNumberings := make(map[string]struct{}, 0)
 
 			for folderInfos := range output {
 				for i := range folderInfos {
 					n, _ := file.ExtractFolderNum(folderInfos[i].Name)
+					if n == 0 {
+						continue
+					}
+
 					episodeName := magicx.EpisodeName(n, magicx.JP)
+
+					notFoundThumbs[episodeName] = struct{}{}
 
 					if folderInfos[i].Size > limited.Folder {
 						folders[episodeName] = struct{}{}
@@ -70,6 +78,8 @@ func main() {
 					maxCount := 0
 					standardWidth := 0
 
+					imageFileNums := []int{}
+
 					for _, f := range folderInfos[i].Files {
 						if f.IsMissmatch {
 							mismatch[episodeName] = struct{}{}
@@ -79,6 +89,7 @@ func main() {
 							if f.Size > limited.Thumbnail.Size {
 								thumbs[episodeName] = struct{}{}
 							}
+							delete(notFoundThumbs, episodeName)
 						} else {
 							// First pass: Group images by width and find the most common width
 							width := f.Width
@@ -89,7 +100,14 @@ func main() {
 								maxCount = widthCounts[width]
 								standardWidth = width
 							}
+
+							fileN, _ := file.ExtractFileNum(f.Name)
+							imageFileNums = append(imageFileNums, fileN)
 						}
+					}
+
+					if !file.IsConsecutive(imageFileNums) {
+						noNumberings[episodeName] = struct{}{}
 					}
 
 					// Second pass: Process grouped images and determine if they are standard
@@ -113,7 +131,7 @@ func main() {
 			}
 
 			myWindow.Canvas().Content().Refresh()
-			resultTextArea.SetText(magicx.ConsoleLog(folders, images, thumbs, mismatch)) // Set the results in the textarea
+			resultTextArea.SetText(magicx.ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings)) // Set the results in the textarea
 			dialog.ShowInformation("Complete", "MagicX processing has been completed.", myWindow)
 			runButton.Enable()
 

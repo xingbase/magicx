@@ -5,6 +5,7 @@ import (
 	"image"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -73,6 +74,22 @@ func HasMismatch(folder string, file string) bool {
 	a, _ := ExtractFolderNum(folder)
 	b, _ := ExtractFileNum(file)
 	return a != b
+}
+
+func IsConsecutive(arr []int) bool {
+	if len(arr) <= 1 {
+		return true
+	}
+
+	sort.Ints(arr)
+
+	for i := 1; i < len(arr); i++ {
+		if arr[i]-arr[i-1] != 1 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func ParseImage(path string) (Image, error) {
