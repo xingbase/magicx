@@ -5,6 +5,7 @@ import (
 	"image"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -52,6 +53,21 @@ func ExtractFileNum(s string) (int, error) {
 	return n, nil
 }
 
+func ExtractFileExtNum(s string, ext string) (int, error) {
+	re := regexp.MustCompile(`_(\d{3})` + ext)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("invalid file name format")
+	}
+
+	n, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
 func FormatSize(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {
@@ -73,6 +89,22 @@ func HasMismatch(folder string, file string) bool {
 	a, _ := ExtractFolderNum(folder)
 	b, _ := ExtractFileNum(file)
 	return a != b
+}
+
+func IsConsecutive(arr []int) bool {
+	if len(arr) <= 1 {
+		return true
+	}
+
+	sort.Ints(arr)
+
+	for i := 1; i < len(arr); i++ {
+		if arr[i]-arr[i-1] != 1 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func ParseImage(path string) (Image, error) {

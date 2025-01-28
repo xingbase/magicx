@@ -113,7 +113,10 @@ func Load(dir string) <-chan []FolderInfo {
 						Format:      img.Format,
 						IsStandard:  true,
 						IsThumbnail: file.HasThumbnail(info.Name()),
-						IsMissmatch: file.HasMismatch(folder, info.Name()),
+					}
+
+					if !fileInfo.IsThumbnail {
+						fileInfo.IsMissmatch = file.HasMismatch(folder, info.Name())
 					}
 
 					files[folder] = append(files[folder], fileInfo)
@@ -167,7 +170,7 @@ func Reanme(in <-chan []FolderInfo) <-chan []FolderInfo {
 						// add padding if the num is less then 3 digits
 						if len(num) < 3 {
 							newNum := fmt.Sprintf("%03s", num)
-							newName := strings.Replace(file.Name, num, newNum, 1)
+							newName := strings.Replace(file.Name, num+file.Ext, newNum+file.Ext, 1)
 							newFile := file.Path + "/" + newName
 
 							// try to rename the file
@@ -216,7 +219,7 @@ func Println(title string, data map[string]struct{}) {
 	}
 }
 
-func ConsoleLog(folders, images, thumbs, mismatch map[string]struct{}) string {
+func ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings map[string]struct{}) string {
 	var results strings.Builder
 
 	logging := func(title string, items map[string]struct{}) {
@@ -236,6 +239,7 @@ func ConsoleLog(folders, images, thumbs, mismatch map[string]struct{}) string {
 	logging("1話内で横幅が統一されていない話", images)
 	logging("話サムネの容量が50KB以上になっていた話", thumbs)
 	logging("フォルダ名とファイル名一致していない話", mismatch)
-
+	logging("サムネがない話", notFoundThumbs)
+	logging("ページ表記が順番でなってない話", noNumberings)
 	return results.String()
 }
