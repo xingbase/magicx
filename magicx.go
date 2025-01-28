@@ -113,7 +113,10 @@ func Load(dir string) <-chan []FolderInfo {
 						Format:      img.Format,
 						IsStandard:  true,
 						IsThumbnail: file.HasThumbnail(info.Name()),
-						IsMissmatch: file.HasMismatch(folder, info.Name()),
+					}
+
+					if !fileInfo.IsThumbnail {
+						fileInfo.IsMissmatch = file.HasMismatch(folder, info.Name())
 					}
 
 					files[folder] = append(files[folder], fileInfo)
@@ -167,7 +170,7 @@ func Reanme(in <-chan []FolderInfo) <-chan []FolderInfo {
 						// add padding if the num is less then 3 digits
 						if len(num) < 3 {
 							newNum := fmt.Sprintf("%03s", num)
-							newName := strings.Replace(file.Name, num, newNum, 1)
+							newName := strings.Replace(file.Name, num+file.Ext, newNum+file.Ext, 1)
 							newFile := file.Path + "/" + newName
 
 							// try to rename the file

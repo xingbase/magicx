@@ -53,6 +53,21 @@ func ExtractFileNum(s string) (int, error) {
 	return n, nil
 }
 
+func ExtractFileExtNum(s string, ext string) (int, error) {
+	re := regexp.MustCompile(`_(\d{3})` + ext)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("invalid file name format")
+	}
+
+	n, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
 func FormatSize(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {

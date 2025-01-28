@@ -101,7 +101,7 @@ func main() {
 								standardWidth = width
 							}
 
-							fileN, _ := file.ExtractFileNum(f.Name)
+							fileN, _ := file.ExtractFileExtNum(f.Name, f.Ext)
 							imageFileNums = append(imageFileNums, fileN)
 						}
 					}
