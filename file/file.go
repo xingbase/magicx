@@ -24,18 +24,27 @@ type Image struct {
 }
 
 func ExtractFolderNum(s string) (int, error) {
-	re := regexp.MustCompile(`^(\d+)_`)
-	matches := re.FindStringSubmatch(s)
-	if len(matches) < 2 {
-		return 0, fmt.Errorf("invalid folder name format")
+	// re := regexp.MustCompile(`^(\d+)_`)
+	// matches := re.FindStringSubmatch(s)
+	// if len(matches) < 2 {
+	// 	return 0, fmt.Errorf("invalid folder name format")
+	// }
+
+	// n, err := strconv.Atoi(matches[1])
+	// if err != nil {
+	// 	return 0, err
+	// }
+
+	// return n, nil
+
+	re := regexp.MustCompile(`\d+`)
+	matches := re.FindAllString(s, -1)
+
+	if len(matches) > 0 {
+		return strconv.Atoi(matches[0])
 	}
 
-	n, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return 0, err
-	}
-
-	return n, nil
+	return 0, fmt.Errorf("no number found in folder name")
 }
 
 func ExtractFileNum(s string) (int, error) {
