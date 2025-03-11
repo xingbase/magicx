@@ -8,7 +8,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/xingbase/magicx/file"
@@ -229,7 +231,13 @@ func ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings 
 			for k := range items {
 				keys = append(keys, k)
 			}
-			sort.Strings(keys)
+
+			sort.Slice(keys, func(i, j int) bool {
+				numI := extractNumber(keys[i])
+				numJ := extractNumber(keys[j])
+				return numI < numJ
+			})
+
 			results.WriteString(strings.Join(keys, ", "))
 			results.WriteString("\n")
 		}
@@ -242,4 +250,18 @@ func ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings 
 	logging("サムネがない話", notFoundThumbs)
 	logging("ページ表記が順番でなってない話", noNumberings)
 	return results.String()
+}
+
+func extractNumber(s string) int {
+	re := regexp.MustCompile(`\d+`)
+	numStr := re.FindString(s)
+	if numStr == "" {
+		return 0
+	}
+	// 문자열을 정수로 변환
+	num, err := strconv.Atoi(numStr)
+	if err != nil {
+		return 0
+	}
+	return num
 }
