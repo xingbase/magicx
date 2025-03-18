@@ -25,7 +25,7 @@ type Language int8
 
 var LimitedSizeInfoByContentType = map[string]LimitedSizeInfo{
 	"comic": {
-		Image:     ImageSize{Width: 1600, Size: 10485760}, // 10MB
+		Image:     ImageSize{Width: 1600, Size: 20971520}, // 20MB
 		Thumbnail: ThumbnailSize{Width: 500, Size: 51200}, // 50KB
 		Folder:    62914560,                               // 60MB
 	},
@@ -221,7 +221,7 @@ func Println(title string, data map[string]struct{}) {
 	}
 }
 
-func ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings map[string]struct{}) string {
+func ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, noNumberings map[string]struct{}) string {
 	var results strings.Builder
 
 	logging := func(title string, items map[string]struct{}) {
@@ -245,6 +245,7 @@ func ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings 
 
 	logging("1話の容量が60MBを超えていた話", folders)
 	logging("1話内で横幅が統一されていない話", images)
+	logging("1ページの容量が20MB以上の話", sizeOver)
 	logging("話サムネの容量が50KB以上になっていた話", thumbs)
 	logging("フォルダ名とファイル名一致していない話", mismatch)
 	logging("サムネがない話", notFoundThumbs)

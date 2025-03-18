@@ -14,7 +14,7 @@ import (
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("MagicX v1.2.9")
+	myWindow := myApp.NewWindow("MagicX v1.3.0")
 
 	folderPathEntry := widget.NewEntry()
 	folderPathEntry.SetPlaceHolder("Enter folder path")
@@ -53,6 +53,7 @@ func main() {
 
 			folders := make(map[string]struct{}, 0)
 			images := make(map[string]struct{}, 0)
+			sizeOver := make(map[string]struct{}, 0)
 			thumbs := make(map[string]struct{}, 0)
 			mismatch := make(map[string]struct{}, 0)
 			notFoundThumbs := make(map[string]struct{}, 0)
@@ -119,7 +120,7 @@ func main() {
 
 							// Check size against limit
 							if img.Size > limited.Image.Size {
-								processedImg.IsStandard = false
+								sizeOver[episodeName] = struct{}{}
 							}
 
 							if !processedImg.IsStandard {
@@ -131,7 +132,7 @@ func main() {
 			}
 
 			myWindow.Canvas().Content().Refresh()
-			resultTextArea.SetText(magicx.ConsoleLog(folders, images, thumbs, mismatch, notFoundThumbs, noNumberings)) // Set the results in the textarea
+			resultTextArea.SetText(magicx.ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, noNumberings)) // Set the results in the textarea
 			dialog.ShowInformation("Complete", "MagicX processing has been completed.", myWindow)
 			runButton.Enable()
 
