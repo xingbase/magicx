@@ -23,6 +23,8 @@ const (
 
 type Language int8
 
+var UnderImageSize int64 = 5120 // 5KB
+
 var LimitedSizeInfoByContentType = map[string]LimitedSizeInfo{
 	"comic": {
 		Image:     ImageSize{Width: 1600, Size: 20971520}, // 20MB
@@ -161,7 +163,7 @@ func Reanme(in <-chan []FolderInfo) <-chan []FolderInfo {
 		for folderInfos := range in {
 			for i := range folderInfos {
 				for j, file := range folderInfos[i].Files {
-					// split file names with “_”
+					// split file names with "_"
 					parts := strings.Split(file.Name, "_")
 
 					if len(parts) > 0 {

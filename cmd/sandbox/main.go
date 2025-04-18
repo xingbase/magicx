@@ -16,6 +16,8 @@ func main() {
 
 	limited := magicx.LimitedSizeInfoByContentType["comic"]
 
+	underImages := make(map[string]struct{}, 0)
+	underThumbs := make(map[string]struct{}, 0)
 	folders := make(map[string]struct{}, 0)
 	images := make(map[string]struct{}, 0)
 	thumbs := make(map[string]struct{}, 0)
@@ -54,6 +56,9 @@ func main() {
 					if f.Size > limited.Thumbnail.Size {
 						thumbs[episodeName] = struct{}{}
 					}
+					if f.Size < magicx.UnderImageSize {
+						underThumbs[episodeName] = struct{}{}
+					}
 
 					delete(notFoundThumbs, episodeName)
 				} else {
@@ -86,6 +91,9 @@ func main() {
 					if img.Size > limited.Image.Size {
 						processedImg.IsStandard = false
 					}
+					if img.Size < magicx.UnderImageSize {
+						underImages[episodeName] = struct{}{}
+					}
 
 					if !processedImg.IsStandard {
 						images[episodeName] = struct{}{}
@@ -98,6 +106,8 @@ func main() {
 	magicx.Println("1話の容量が60MBを超えていた話", folders)
 	magicx.Println("1話内で横幅が統一されていない話", images)
 	magicx.Println("話サムネの容量が50KB以上になっていた話", thumbs)
+	magicx.Println("1話の容量が5KB以下になっていた話", underImages)
+	magicx.Println("話サムネの容量が5KB以下になっていた話", underThumbs)
 	magicx.Println("フォルダ名とファイル名一致していない話", mismatch)
 	magicx.Println("サムネがない話", notFoundThumbs)
 	magicx.Println("ページ表記が順番でなってない話", notNumberings)
