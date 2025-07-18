@@ -14,7 +14,7 @@ import (
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("MagicX v1.3.1")
+	myWindow := myApp.NewWindow("MagicX v1.4.0")
 
 	folderPathEntry := widget.NewEntry()
 	folderPathEntry.SetPlaceHolder("Enter folder path")
