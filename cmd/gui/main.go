@@ -103,6 +103,7 @@ func main() {
 							}
 
 							fileN, _ := file.ExtractFileExtNum(f.Name, f.Ext)
+
 							imageFileNums = append(imageFileNums, fileN)
 						}
 					}

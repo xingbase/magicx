@@ -24,37 +24,26 @@ type Image struct {
 }
 
 func ExtractFolderNum(s string) (int, error) {
-	// re := regexp.MustCompile(`^(\d+)_`)
-	// matches := re.FindStringSubmatch(s)
-	// if len(matches) < 2 {
-	// 	return 0, fmt.Errorf("invalid folder name format")
-	// }
-
-	// n, err := strconv.Atoi(matches[1])
-	// if err != nil {
-	// 	return 0, err
-	// }
-
-	// return n, nil
-
 	re := regexp.MustCompile(`\d+`)
-	matches := re.FindAllString(s, -1)
+	match := re.FindString(s)
 
-	if len(matches) > 0 {
-		return strconv.Atoi(matches[0])
+	if match != "" {
+		return strconv.Atoi(match)
 	}
 
 	return 0, fmt.Errorf("no number found in folder name")
 }
 
 func ExtractFileNum(s string) (int, error) {
-	re := regexp.MustCompile(`_(\d{4})_`)
-	matches := re.FindStringSubmatch(s)
-	if len(matches) < 2 {
+	parts := strings.Split(s, "_")
+
+	re := regexp.MustCompile(`\d+`)
+	match := re.FindString(parts[1])
+	if match == "" {
 		return 0, fmt.Errorf("invalid file name format")
 	}
 
-	n, err := strconv.Atoi(matches[1])
+	n, err := strconv.Atoi(match)
 	if err != nil {
 		return 0, err
 	}
@@ -63,13 +52,16 @@ func ExtractFileNum(s string) (int, error) {
 }
 
 func ExtractFileExtNum(s string, ext string) (int, error) {
-	re := regexp.MustCompile(`_(\d{3})` + ext)
-	matches := re.FindStringSubmatch(s)
-	if len(matches) < 2 {
+	s = strings.ReplaceAll(s, ext, "")
+	parts := strings.Split(s, "_")
+
+	re := regexp.MustCompile(`\d+`)
+	match := re.FindString(parts[len(parts)-1])
+	if match == "" {
 		return 0, fmt.Errorf("invalid file name format")
 	}
 
-	n, err := strconv.Atoi(matches[1])
+	n, err := strconv.Atoi(match)
 	if err != nil {
 		return 0, err
 	}
@@ -97,6 +89,9 @@ func HasThumbnail(s string) bool {
 func HasMismatch(folder string, file string) bool {
 	a, _ := ExtractFolderNum(folder)
 	b, _ := ExtractFileNum(file)
+
+	// log.Println("folder ", folder, " n ", a, " file ", file, " n ", b)
+
 	return a != b
 }
 
