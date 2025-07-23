@@ -223,7 +223,7 @@ func Println(title string, data map[string]struct{}) {
 	}
 }
 
-func ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, noNumberings map[string]struct{}) string {
+func ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, notFoundImages, noNumberings map[string]struct{}) string {
 	var results strings.Builder
 
 	logging := func(title string, items map[string]struct{}) {
@@ -251,7 +251,8 @@ func ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, noN
 	logging("話サムネの容量が50KB以上になっていた話", thumbs)
 	logging("フォルダ名とファイル名一致していない話", mismatch)
 	logging("サムネがない話", notFoundThumbs)
-	logging("ページ表記が順番でなってない話", noNumberings)
+	logging("イメージがない話", notFoundImages)
+	logging("ページ表記が順番になってない話", noNumberings)
 	return results.String()
 }
 

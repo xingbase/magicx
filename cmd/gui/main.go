@@ -14,7 +14,7 @@ import (
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("MagicX v1.4.0")
+	myWindow := myApp.NewWindow("MagicX v1.4.1")
 
 	folderPathEntry := widget.NewEntry()
 	folderPathEntry.SetPlaceHolder("Enter folder path")
@@ -57,6 +57,7 @@ func main() {
 			thumbs := make(map[string]struct{}, 0)
 			mismatch := make(map[string]struct{}, 0)
 			notFoundThumbs := make(map[string]struct{}, 0)
+			notFoundImages := make(map[string]struct{}, 0)
 			noNumberings := make(map[string]struct{}, 0)
 
 			for folderInfos := range output {
@@ -112,6 +113,10 @@ func main() {
 						noNumberings[episodeName] = struct{}{}
 					}
 
+					if len(imageFileNums) == 0 {
+						notFoundImages[episodeName] = struct{}{}
+					}
+
 					// Second pass: Process grouped images and determine if they are standard
 					for width, imgs := range groupedImages {
 						isStandardWidth := (width == standardWidth)
@@ -133,7 +138,7 @@ func main() {
 			}
 
 			myWindow.Canvas().Content().Refresh()
-			resultTextArea.SetText(magicx.ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, noNumberings)) // Set the results in the textarea
+			resultTextArea.SetText(magicx.ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, notFoundImages, noNumberings)) // Set the results in the textarea
 			dialog.ShowInformation("Complete", "MagicX processing has been completed.", myWindow)
 			runButton.Enable()
 

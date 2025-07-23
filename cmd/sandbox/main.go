@@ -24,6 +24,7 @@ func main() {
 	mismatch := make(map[string]struct{}, 0)
 	notFoundThumbs := make(map[string]struct{}, 0)
 	notNumberings := make(map[string]struct{}, 0)
+	notFoundImages := make(map[string]struct{}, 0)
 
 	for folderInfos := range result {
 		for i := range folderInfos {
@@ -80,6 +81,10 @@ func main() {
 				notNumberings[episodeName] = struct{}{}
 			}
 
+			if len(imageFileNums) == 0 {
+				notFoundImages[episodeName] = struct{}{}
+			}
+
 			// Second pass: Process grouped images and determine if they are standard
 			for width, imgs := range groupedImages {
 				isStandardWidth := (width == standardWidth)
@@ -110,6 +115,7 @@ func main() {
 	magicx.Println("話サムネの容量が5KB以下になっていた話", underThumbs)
 	magicx.Println("フォルダ名とファイル名一致していない話", mismatch)
 	magicx.Println("サムネがない話", notFoundThumbs)
-	magicx.Println("ページ表記が順番でなってない話", notNumberings)
+	magicx.Println("イメージがない話", notFoundImages)
+	magicx.Println("ページ表記が順番になってない話", notNumberings)
 
 }
