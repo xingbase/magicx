@@ -88,10 +88,16 @@ func main() {
 						}
 
 						if f.IsThumbnail {
+							thumbN, _ := file.ExtractFolderNum(f.Name)
+
 							if f.Size > limited.Thumbnail.Size {
 								thumbs[episodeName] = struct{}{}
 							}
-							delete(notFoundThumbs, episodeName)
+
+							if thumbN == n {
+								delete(notFoundThumbs, episodeName)
+							}
+
 						} else {
 							// First pass: Group images by width and find the most common width
 							width := f.Width
