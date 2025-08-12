@@ -35,15 +35,13 @@ func ExtractFolderNum(s string) (int, error) {
 }
 
 func ExtractFileNum(s string) (int, error) {
-	parts := strings.Split(s, "_")
-
 	re := regexp.MustCompile(`\d+`)
-	match := re.FindString(parts[1])
-	if match == "" {
+	numbers := re.FindAllString(s, -1)
+	if len(numbers) == 0 {
 		return 0, fmt.Errorf("invalid file name format")
 	}
 
-	n, err := strconv.Atoi(match)
+	n, err := strconv.Atoi(numbers[0])
 	if err != nil {
 		return 0, err
 	}
@@ -52,16 +50,14 @@ func ExtractFileNum(s string) (int, error) {
 }
 
 func ExtractFileExtNum(s string, ext string) (int, error) {
-	s = strings.ReplaceAll(s, ext, "")
-	parts := strings.Split(s, "_")
-
 	re := regexp.MustCompile(`\d+`)
-	match := re.FindString(parts[len(parts)-1])
-	if match == "" {
+
+	numbers := re.FindAllString(s, -1)
+	if len(numbers) == 0 {
 		return 0, fmt.Errorf("invalid file name format")
 	}
 
-	n, err := strconv.Atoi(match)
+	n, err := strconv.Atoi(numbers[len(numbers)-1])
 	if err != nil {
 		return 0, err
 	}

@@ -14,7 +14,7 @@ import (
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("MagicX v1.4.1")
+	myWindow := myApp.NewWindow("MagicX v1.4.3")
 
 	folderPathEntry := widget.NewEntry()
 	folderPathEntry.SetPlaceHolder("Enter folder path")
@@ -110,7 +110,6 @@ func main() {
 							}
 
 							fileN, _ := file.ExtractFileExtNum(f.Name, f.Ext)
-
 							imageFileNums = append(imageFileNums, fileN)
 						}
 					}
