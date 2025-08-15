@@ -245,10 +245,10 @@ func ConsoleLog(folders, images, sizeOver, thumbs, mismatch, notFoundThumbs, not
 		}
 	}
 
-	logging("1話の容量が60MBを超えていた話", folders)
+	// logging("1話の容量が60MBを超えていた話", folders) // don't check
 	logging("1話内で横幅が統一されていない話", images)
 	logging("1ページの容量が20MB以上の話", sizeOver)
-	logging("話サムネの容量が50KB以上になっていた話", thumbs)
+	// logging("話サムネの容量が50KB以上になっていた話", thumbs) // don't check
 	logging("フォルダ名とファイル名一致していない話", mismatch)
 	logging("サムネがない話", notFoundThumbs)
 	logging("イメージがない話", notFoundImages)
